@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Appel de présence</title>
+<style>
+  :root{
+    --bg: #0b1220;
+    --bg-soft: #121b2e;
+    --line: #22304a;
+    --text: #e8edf7;
+    --muted: #8b9bb8;
+    --accent: #3fd0c9;
+    --accent-dim: #1f7a75;
+    --danger: #ff4d5e;
+    --danger-dim: #4a1218;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ height:100%; margin:0; }
+  body{
+    background: radial-gradient(circle at 50% -10%, #16233d 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    display:flex; align-items:center; justify-content:center;
+    min-height:100vh; padding:24px;
+  }
+  .card{
+    width:100%; max-width:420px;
+    background: var(--bg-soft);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:32px 28px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+  }
+  .badge{
+    display:inline-flex; align-items:center; gap:8px;
+    font-size:12px; letter-spacing:.08em; text-transform:uppercase;
+    color: var(--accent); background: rgba(63,208,201,0.1);
+    border:1px solid var(--accent-dim);
+    padding:5px 10px; border-radius:999px; margin-bottom:18px;
+  }
+  .badge::before{ content:""; width:6px; height:6px; border-radius:50%; background:var(--accent); }
+  h1{ font-size:22px; margin:0 0 6px; }
+  p.sub{ color:var(--muted); font-size:14px; margin:0 0 24px; line-height:1.5; }
+  label{ font-size:13px; color:var(--muted); display:block; margin-bottom:6px; }
+  input[type=text]{
+    width:100%; padding:12px 14px; border-radius:10px;
+    border:1px solid var(--line); background:#0e1626; color:var(--text);
+    font-size:15px; outline:none; transition:border-color .15s;
+  }
+  input[type=text]:focus{ border-color: var(--accent); }
+  button{
+    width:100%; margin-top:18px; padding:13px; border:none; border-radius:10px;
+    background: var(--accent); color:#06231f; font-weight:600; font-size:15px;
+    cursor:pointer; transition: transform .1s, background .15s;
+  }
+  button:hover{ background:#57d9d3; }
+  button:active{ transform: scale(0.98); }
+  .waiting{ display:none; text-align:center; }
+  .waiting .pulse{
+    width:52px; height:52px; margin:0 auto 18px; border-radius:50%;
+    border:3px solid var(--accent-dim); border-top-color: var(--accent);
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
+  .waiting h2{ font-size:17px; margin:0 0 6px; }
+  .waiting p{ color:var(--muted); font-size:13px; margin:0; }
+
+  /* Overlay du piège */
+  #trap-overlay{
+    position:fixed; inset:0; z-index:999;
+    background: linear-gradient(160deg, #2a0b0f 0%, #120507 100%);
+    display:none; align-items:center; justify-content:center;
+    padding:24px; text-align:center;
+  }
+  #trap-overlay .box{
+    max-width:480px;
+  }
+  #trap-overlay .icon{
+    font-size:56px; margin-bottom:18px;
+    animation: shake 0.5s ease-in-out;
+  }
+  @keyframes shake{
+    0%,100%{ transform: translateX(0); }
+    20%{ transform: translateX(-8px); }
+    40%{ transform: translateX(8px); }
+    60%{ transform: translateX(-6px); }
+    80%{ transform: translateX(6px); }
+  }
+  #trap-overlay h1{
+    color: var(--danger); font-size:26px; margin:0 0 12px;
+  }
+  #trap-overlay p{
+    color:#f4c6cb; font-size:15px; line-height:1.6; margin:0 0 10px;
+  }
+  #trap-overlay .foot{
+    margin-top:22px; font-size:12px; color:#c98d93;
+    border-top:1px solid #4a1218; padding-top:16px;
+  }
+</style>
+</head>
+<body>
+
+  <div class="card" id="form-card">
+    <span class="badge">Appel de présence</span>
+    <h1>Confirmez votre présence</h1>
+    <p class="sub">Merci d'indiquer votre nom et prénom pour valider votre participation à la formation.</p>
+    <label for="name">Nom et prénom</label>
+    <input type="text" id="name" placeholder="ex : Camille Durand" autocomplete="name">
+    <button id="submit-btn">Valider ma présence</button>
+  </div>
+
+  <div class="card waiting" id="waiting-card">
+    <div class="pulse"></div>
+    <h2>Présence enregistrée</h2>
+    <p>Vous pouvez garder cette page ouverte pendant la session.</p>
+  </div>
+
+  <div id="trap-overlay">
+    <div class="box">
+      <div class="icon">🎣</div>
+      <h1>Vous venez d'être piégé</h1>
+      <p>Ce QR code n'était pas un vrai appel de présence : c'était une simulation de <strong>quishing</strong> (phishing par QR code).</p>
+      <p>Un vrai attaquant aurait pu, avec cette même mécanique, voler vos identifiants, installer un logiciel malveillant, ou usurper une page officielle.</p>
+      <div class="foot">Réflexe à retenir : vérifiez toujours l'URL affichée après le scan, avant de saisir la moindre information.</div>
+    </div>
+  </div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+  const formCard = document.getElementById('form-card');
+  const waitingCard = document.getElementById('waiting-card');
+  const overlay = document.getElementById('trap-overlay');
+
+  socket.emit('join-presence');
+
+  socket.on('trap-triggered', () => {
+    overlay.style.display = 'flex';
+  });
+
+  document.getElementById('submit-btn').addEventListener('click', async () => {
+    const nameInput = document.getElementById('name');
+    const name = nameInput.value.trim();
+    if (!name) { nameInput.focus(); return; }
+
+    try {
+      await fetch('/api/presence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name })
+      });
+    } catch (e) { /* silencieux : la démo continue même hors-ligne */ }
+
+    formCard.style.display = 'none';
+    waitingCard.style.display = 'block';
+  });
+
+  document.getElementById('name').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('submit-btn').click();
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "quishing-demo",
+  "version": "1.0.0",
+  "description": "Demo de sensibilisation au quishing (QR code phishing) - appel de presence piege",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5",
+    "qrcode": "^1.5.3"
+  }
+}
