@@ -111,6 +111,7 @@
         <h2>Stagiaires connectés</h2>
         <div class="count" id="count">0</div>
         <div class="count-label">appel(s) de présence validé(s)</div>
+        <div class="count-label" id="push-count" style="margin-top:6px;">0 abonnement(s) notification active(s)</div>
         <ul id="participants"></ul>
 
         <button class="trigger-btn" id="trigger-btn">🎣 Déclencher le piège maintenant</button>
@@ -169,15 +170,22 @@
     });
   }
 
+  function renderPushCount(count){
+    document.getElementById('push-count').textContent =
+      `${count} abonnement(s) notification active(s)`;
+  }
+
   async function refreshParticipants(){
     const res = await fetch('/api/participants', { headers: { 'x-admin-password': ADMIN_PWD } });
     if (res.ok) {
       const data = await res.json();
       renderParticipants(data.participants);
+      renderPushCount(data.subscriptionCount || 0);
     }
   }
 
   socket.on('participant-joined', () => refreshParticipants());
+  socket.on('subscription-count', (data) => renderPushCount(data.count));
 
   function loadQr(){
     document.getElementById('qr-img').src = '/api/qrcode.png?t=' + Date.now();
@@ -202,8 +210,9 @@
     const res = await fetch('/api/trigger-trap', { method:'POST', headers: authHeaders() });
     const data = await res.json();
     const status = document.getElementById('trigger-status');
-    status.textContent = `Piège déclenché — ${data.notified} stagiaire(s) notifié(s).`;
+    status.textContent = `Piège déclenché — ${data.pushSent}/${data.pushTotal} notification(s) push envoyée(s), ${data.notified} présence(s) au total.`;
     status.classList.add('ok');
+    renderPushCount(data.pushTotal - (data.pushFailed || 0));
     setTimeout(() => { btn.disabled = false; }, 2000);
   });
 

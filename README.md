@@ -21,6 +21,45 @@ npm install
 node server.js
 ```
 
+## 3bis. Lancement via Docker (alternative)
+
+Si vous préférez isoler l'application dans un conteneur (recommandé pour ne
+rien installer sur votre machine hôte hors Docker) :
+
+```bash
+touch vapid-keys.json   # important, voir note ci-dessous
+docker compose up --build
+```
+
+> **Important** : créez d'abord un fichier vide `vapid-keys.json` à la racine
+> avec `touch` avant le premier lancement. Sans ça, Docker crée un **dossier**
+> à la place du fichier monté en volume, ce qui empêche le serveur de
+> persister ses clés Web Push — et donc invalide tous les abonnements
+> notification des stagiaires à chaque redémarrage du conteneur.
+
+- L'application est accessible uniquement en local, depuis votre navigateur,
+  via **http://localhost:3000** (le port n'est mappé que sur `127.0.0.1`,
+  donc invisible depuis le réseau local — seul le tunnel Cloudflare/ngrok
+  que vous lancerez à côté sera exposé publiquement, voir section 4).
+- Pour changer le mot de passe admin, éditez la variable `ADMIN_PASSWORD`
+  dans `docker-compose.yml` avant de lancer, ou surchargez-la en ligne de commande :
+
+```bash
+ADMIN_PASSWORD="votre_mot_de_passe" docker compose up --build
+```
+
+- Pour arrêter : `docker compose down`
+- Les données des stagiaires (noms saisis) sont en mémoire dans le conteneur :
+  elles sont perdues à chaque `docker compose down` / redémarrage, ce qui est
+  volontaire (pas de trace entre deux sessions).
+
+Sans Docker Compose, en Docker classique :
+
+```bash
+docker build -t quishing-demo .
+docker run --rm -p 127.0.0.1:3000:3000 -e ADMIN_PASSWORD=formation2026 quishing-demo
+```
+
 Par défaut :
 - Mot de passe admin : `formation2026`
 - Page stagiaires : http://localhost:3000/presence.html
@@ -69,13 +108,33 @@ Le terminal affiche une URL du type `https://xxxx.ngrok-free.app`.
 ## 6. Déroulé de la session
 
 1. Vous projetez le QR code depuis la page admin
-2. Les stagiaires scannent et renseignent leur nom → ils voient "Présence
-   enregistrée" et gardent l'onglet ouvert
-3. La page admin affiche en temps réel le nombre de présences validées
-4. Vous déroulez votre formation normalement
-5. Au moment choisi, cliquez sur **"🎣 Déclencher le piège maintenant"**
-6. Tous les téléphones connectés affichent instantanément un écran
-   d'alerte expliquant qu'il s'agissait d'une simulation de quishing
+2. Les stagiaires scannent, renseignent leur nom, et cliquent sur **"Valider
+   ma présence"**. Ce même clic déclenche aussitôt la demande d'autorisation
+   de notifications du navigateur (une seule popup native, à accepter) —
+   il n'y a pas de bouton séparé « activer les notifications »
+3. Une fois la permission accordée, les stagiaires peuvent fermer l'onglet
+   ou changer d'application : ils **n'ont plus besoin de garder la page
+   ouverte**
+4. La page admin affiche en temps réel le nombre de présences validées et
+   le nombre d'abonnements notification actifs
+5. Vous déroulez votre formation normalement
+6. Au moment choisi, cliquez sur **"🎣 Déclencher le piège maintenant"**
+7. Chaque stagiaire reçoit alors :
+   - **une vraie notification système**, affichée automatiquement par le
+     téléphone (aucun clic à faire pour la voir, elle apparaît d'elle-même),
+     s'il a accepté les notifications à l'étape 2 ; ou
+   - **un écran plein écran** avec le message d'alerte s'il a refusé les
+     notifications ou si son navigateur ne les supporte pas — cet écran se
+     ferme tout seul au bout d'une minute, sans action requise
+
+### Limitation connue : iPhone / Safari
+
+Sur iPhone, les notifications push de sites web ne fonctionnent que si la
+page a été **ajoutée à l'écran d'accueil** au préalable (limitation Apple).
+La page affiche automatiquement un message d'aide à ce sujet sur iOS.
+Pour les stagiaires sur iPhone qui n'ont pas fait cette manipulation, prévoyez
+qu'ils gardent simplement l'onglet ouvert : ils recevront l'écran plein écran
+via le fallback.
 
 ## 7. Entre deux sessions
 

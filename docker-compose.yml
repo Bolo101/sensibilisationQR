@@ -1,0 +1,17 @@
+services:
+  quishing-demo:
+    build: .
+    container_name: quishing-demo
+    ports:
+      # Accès depuis le navigateur en localhost uniquement (127.0.0.1:3000)
+      # -> pas exposé sur le réseau local, seul le tunnel Cloudflare/ngrok
+      #    pointera dessus pour l'accès des stagiaires.
+      - "127.0.0.1:3000:3000"
+    environment:
+      - ADMIN_PASSWORD=formation2026
+      - PORT=3000
+    volumes:
+      # Conserve les clés VAPID entre redémarrages : sans ça, tous les
+      # abonnements push des stagiaires deviennent invalides à chaque redéploiement.
+      - ./vapid-keys.json:/app/vapid-keys.json
+    restart: unless-stopped

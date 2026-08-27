@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Appel de présence</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0b1220">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Présence">
+<link rel="apple-touch-icon" href="/icon.png">
 <style>
   :root{
     --bg: #0b1220;
@@ -67,6 +73,13 @@
   .waiting h2{ font-size:17px; margin:0 0 6px; }
   .waiting p{ color:var(--muted); font-size:13px; margin:0; }
 
+  .ios-hint{
+    display:none; max-width:420px; width:100%; margin:0 0 14px;
+    background: rgba(63,208,201,0.08); border:1px solid var(--accent-dim);
+    border-radius:12px; padding:14px 16px; font-size:13px; line-height:1.5; color:var(--text);
+  }
+  .ios-hint strong{ color:var(--accent); }
+
   /* Overlay du piège */
   #trap-overlay{
     position:fixed; inset:0; z-index:999;
@@ -102,6 +115,13 @@
 </head>
 <body>
 
+  <div class="ios-hint" id="ios-hint">
+    📱 <strong>Sur iPhone</strong> : pour recevoir une vraie notification même app fermée,
+    ajoutez d'abord cette page à l'écran d'accueil
+    (bouton Partager <strong>⬆️</strong> → <strong>Sur l'écran d'accueil</strong>),
+    puis rouvrez-la depuis l'icône avant de valider votre présence.
+  </div>
+
   <div class="card" id="form-card">
     <span class="badge">Appel de présence</span>
     <h1>Confirmez votre présence</h1>
@@ -114,7 +134,7 @@
   <div class="card waiting" id="waiting-card">
     <div class="pulse"></div>
     <h2>Présence enregistrée</h2>
-    <p>Vous pouvez garder cette page ouverte pendant la session.</p>
+    <p id="waiting-sub">Activation des notifications en cours...</p>
   </div>
 
   <div id="trap-overlay">
@@ -133,12 +153,104 @@
   const formCard = document.getElementById('form-card');
   const waitingCard = document.getElementById('waiting-card');
   const overlay = document.getElementById('trap-overlay');
+  const waitingSub = document.getElementById('waiting-sub');
+  const iosHint = document.getElementById('ios-hint');
+
+  // Affiche l'écran plein écran pendant 1 minute puis le referme automatiquement.
+  function showTrapOverlay() {
+    formCard.style.display = 'none';
+    waitingCard.style.display = 'none';
+    overlay.style.display = 'flex';
+    clearTimeout(showTrapOverlay._t);
+    showTrapOverlay._t = setTimeout(() => {
+      overlay.style.display = 'none';
+    }, 60000);
+  }
+
+  // Si on arrive ici via le clic sur la notification système (?trap=1),
+  // on affiche l'overlay immédiatement, sans attendre le socket.
+  if (new URLSearchParams(location.search).get('trap') === '1') {
+    showTrapOverlay();
+  }
+
+  // Message envoyé par le Service Worker quand l'onglet est au premier plan
+  // au moment du push : on affiche l'overlay en plein écran (pas de
+  // notification système redondante dans ce cas).
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'trap-triggered') {
+        showTrapOverlay();
+      }
+    });
+  }
+
+  // Repère un iPhone/iPad pas encore installé en PWA : les notifications
+  // système n'y fonctionneront pas tant que la page n'est pas ajoutée à
+  // l'écran d'accueil (limitation Apple, indépendante de cette application).
+  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = window.navigator.standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches;
+  if (isIos && !isStandalone) {
+    iosHint.style.display = 'block';
+  }
 
   socket.emit('join-presence');
 
+  // Fallback : si l'onglet est resté ouvert et que le socket est encore
+  // connecté, on affiche aussi l'overlay par ce canal (redondant avec le
+  // Service Worker mais inoffensif, utile si le navigateur ne supporte pas
+  // le Push API).
   socket.on('trap-triggered', () => {
-    overlay.style.display = 'flex';
+    showTrapOverlay();
   });
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+  }
+
+  async function setupPushNotifications() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      if (waitingSub) waitingSub.textContent =
+        "Votre navigateur ne supporte pas les notifications système : gardez cette page ouverte.";
+      return;
+    }
+
+    try {
+      const registration = await navigator.serviceWorker.register('/sw.js');
+
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        if (waitingSub) waitingSub.textContent =
+          "Notifications refusées : gardez cette page ouverte pour recevoir l'alerte.";
+        return;
+      }
+
+      const { publicKey } = await fetch('/api/vapid-public-key').then(r => r.json());
+
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey)
+        });
+      }
+
+      await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(subscription)
+      });
+
+      if (waitingSub) waitingSub.textContent =
+        "Notifications activées : vous pouvez fermer l'onglet ou changer d'application.";
+    } catch (e) {
+      if (waitingSub) waitingSub.textContent =
+        "Notifications non disponibles : gardez cette page ouverte.";
+    }
+  }
 
   document.getElementById('submit-btn').addEventListener('click', async () => {
     const nameInput = document.getElementById('name');
@@ -155,6 +267,10 @@
 
     formCard.style.display = 'none';
     waitingCard.style.display = 'block';
+
+    // La demande de permission doit suivre un geste utilisateur (le clic) :
+    // on la déclenche juste après la validation de présence.
+    setupPushNotifications();
   });
 
   document.getElementById('name').addEventListener('keydown', (e) => {
