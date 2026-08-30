@@ -4,12 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Appel de présence</title>
-<link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0b1220">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Présence">
-<link rel="apple-touch-icon" href="/icon.png">
 <style>
   :root{
     --bg: #0b1220;
@@ -73,13 +68,6 @@
   .waiting h2{ font-size:17px; margin:0 0 6px; }
   .waiting p{ color:var(--muted); font-size:13px; margin:0; }
 
-  .ios-hint{
-    display:none; max-width:420px; width:100%; margin:0 0 14px;
-    background: rgba(63,208,201,0.08); border:1px solid var(--accent-dim);
-    border-radius:12px; padding:14px 16px; font-size:13px; line-height:1.5; color:var(--text);
-  }
-  .ios-hint strong{ color:var(--accent); }
-
   /* Overlay du piège */
   #trap-overlay{
     position:fixed; inset:0; z-index:999;
@@ -115,13 +103,6 @@
 </head>
 <body>
 
-  <div class="ios-hint" id="ios-hint">
-    📱 <strong>Sur iPhone</strong> : pour recevoir une vraie notification même app fermée,
-    ajoutez d'abord cette page à l'écran d'accueil
-    (bouton Partager <strong>⬆️</strong> → <strong>Sur l'écran d'accueil</strong>),
-    puis rouvrez-la depuis l'icône avant de valider votre présence.
-  </div>
-
   <div class="card" id="form-card">
     <span class="badge">Appel de présence</span>
     <h1>Confirmez votre présence</h1>
@@ -154,7 +135,6 @@
   const waitingCard = document.getElementById('waiting-card');
   const overlay = document.getElementById('trap-overlay');
   const waitingSub = document.getElementById('waiting-sub');
-  const iosHint = document.getElementById('ios-hint');
 
   // Affiche l'écran plein écran pendant 1 minute puis le referme automatiquement.
   function showTrapOverlay() {
@@ -182,16 +162,6 @@
         showTrapOverlay();
       }
     });
-  }
-
-  // Repère un iPhone/iPad pas encore installé en PWA : les notifications
-  // système n'y fonctionneront pas tant que la page n'est pas ajoutée à
-  // l'écran d'accueil (limitation Apple, indépendante de cette application).
-  const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const isStandalone = window.navigator.standalone === true ||
-    window.matchMedia('(display-mode: standalone)').matches;
-  if (isIos && !isStandalone) {
-    iosHint.style.display = 'block';
   }
 
   socket.emit('join-presence');
@@ -245,10 +215,10 @@
       });
 
       if (waitingSub) waitingSub.textContent =
-        "Notifications activées : vous pouvez fermer l'onglet ou changer d'application.";
+        "Notification activée pour cette session : vous pouvez fermer l'onglet ou changer d'application.";
     } catch (e) {
       if (waitingSub) waitingSub.textContent =
-        "Notifications non disponibles : gardez cette page ouverte.";
+        "Notification indisponible sur cet appareil : gardez cette page ouverte.";
     }
   }
 

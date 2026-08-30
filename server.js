@@ -55,10 +55,6 @@ function addSubscription(sub) {
     subscriptions.push(sub);
   }
 }
-function removeSubscriptionByEndpoint(endpoint) {
-  const idx = subscriptions.findIndex((s) => s.endpoint === endpoint);
-  if (idx !== -1) subscriptions.splice(idx, 1);
-}
 
 // --- Middleware simple pour protéger les routes admin ---
 function checkAdmin(req, res, next) {
@@ -142,23 +138,20 @@ app.post('/api/trigger-trap', checkAdmin, async (req, res) => {
   const pushTotal = subscriptions.length;
   let sent = 0;
   let failed = 0;
-  const deadEndpoints = [];
 
+  // Usage strictement ponctuel : chaque abonnement ne sert qu'une seule
+  // fois. On envoie, puis on vide immédiatement la liste — qu'un
+  // stagiaire scanne de nouveau plus tard, il repartira d'un abonnement
+  // neuf, sans rien conservé de la précédente notification.
   await Promise.all(subscriptions.map(async (sub) => {
     try {
       await webpush.sendNotification(sub, payload);
       sent++;
     } catch (err) {
       failed++;
-      // Abonnement expiré/invalide (désinstallation, permission révoquée...) :
-      // on le retire pour ne plus retenter aux prochains déclenchements
-      if (err.statusCode === 404 || err.statusCode === 410) {
-        deadEndpoints.push(sub.endpoint);
-      }
     }
   }));
-
-  deadEndpoints.forEach(removeSubscriptionByEndpoint);
+  subscriptions.length = 0;
 
   res.json({ ok: true, notified: participants.length, pushSent: sent, pushFailed: failed, pushTotal });
 });
@@ -166,6 +159,7 @@ app.post('/api/trigger-trap', checkAdmin, async (req, res) => {
 // --- Réinitialisation entre deux sessions ---
 app.post('/api/reset', checkAdmin, (req, res) => {
   participants.length = 0;
+  subscriptions.length = 0;
   res.json({ ok: true });
 });
 

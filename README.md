@@ -4,6 +4,13 @@ Application self-hosted et gratuite pour simuler un "appel de présence" par QR 
 piégé, avec déclenchement en direct d'une notification d'alerte sur les téléphones
 des stagiaires.
 
+**Sans persistance / usage unique** : aucune installation n'est demandée aux
+stagiaires (pas de PWA, pas d'icône ajoutée à l'écran d'accueil). L'abonnement
+notification créé au clic sur "Valider ma présence" ne sert qu'une seule fois :
+dès que le piège est déclenché, le service worker se désabonne et se
+désinstalle automatiquement côté téléphone, et le serveur supprime l'abonnement
+correspondant. Rien ne reste sur l'appareil après la session.
+
 ## 1. Prérequis
 
 - Node.js installé (v18 ou plus) — https://nodejs.org
@@ -129,12 +136,13 @@ Le terminal affiche une URL du type `https://xxxx.ngrok-free.app`.
 
 ### Limitation connue : iPhone / Safari
 
-Sur iPhone, les notifications push de sites web ne fonctionnent que si la
-page a été **ajoutée à l'écran d'accueil** au préalable (limitation Apple).
-La page affiche automatiquement un message d'aide à ce sujet sur iOS.
-Pour les stagiaires sur iPhone qui n'ont pas fait cette manipulation, prévoyez
-qu'ils gardent simplement l'onglet ouvert : ils recevront l'écran plein écran
-via le fallback.
+Sur iPhone, les notifications push de sites web nécessitent que la page soit
+installée sur l'écran d'accueil (limitation Apple). Comme cette démo est
+volontairement **sans aucune persistance** sur l'appareil (pas d'installation,
+rien qui reste après la session), nous ne proposons pas cette manipulation
+aux stagiaires. Sur iPhone, ils basculeront donc automatiquement sur le
+fallback plein écran : il suffit qu'ils gardent l'onglet ouvert pendant la
+formation pour recevoir l'alerte au bon moment.
 
 ## 7. Entre deux sessions
 
