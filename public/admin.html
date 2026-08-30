@@ -3,13 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin — Sensibilisation Quishing</title>
+<title>Appel de présence</title>
 <style>
   :root{
     --bg:#0b1220; --bg-soft:#121b2e; --line:#22304a;
     --text:#e8edf7; --muted:#8b9bb8;
     --accent:#3fd0c9; --accent-dim:#1f7a75;
-    --danger:#ff4d5e; --danger-dim:#3a1015;
   }
   *{ box-sizing:border-box; }
   body{
@@ -18,8 +17,8 @@
     color:var(--text); font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
     padding:32px 20px;
   }
-  .wrap{ max-width:920px; margin:0 auto; }
-  h1{ font-size:22px; margin:0 0 4px; }
+  .wrap{ max-width:960px; margin:0 auto; }
+  h1{ font-size:24px; margin:0 0 4px; }
   p.sub{ color:var(--muted); font-size:14px; margin:0 0 28px; }
 
   .login{ max-width:360px; margin:80px auto; background:var(--bg-soft); border:1px solid var(--line);
@@ -29,93 +28,87 @@
     background:#0e1626; color:var(--text); font-size:14px; }
   .login button{ width:100%; margin-top:14px; padding:11px; border:none; border-radius:9px;
     background:var(--accent); color:#06231f; font-weight:600; cursor:pointer; }
-  .login .err{ color:var(--danger); font-size:13px; margin-top:10px; display:none; }
+  .login .err{ color:#ff8a94; font-size:13px; margin-top:10px; display:none; }
 
   #dashboard{ display:none; }
 
-  .grid{ display:grid; grid-template-columns: 300px 1fr; gap:20px; }
-  @media (max-width:720px){ .grid{ grid-template-columns:1fr; } }
+  .grid{ display:grid; grid-template-columns: 340px 1fr; gap:20px; }
+  @media (max-width:760px){ .grid{ grid-template-columns:1fr; } }
 
-  .panel{ background:var(--bg-soft); border:1px solid var(--line); border-radius:14px; padding:20px; }
+  .panel{ background:var(--bg-soft); border:1px solid var(--line); border-radius:14px; padding:22px; }
   .panel h2{ font-size:14px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 14px; }
 
-  #qr-panel img{ width:100%; border-radius:10px; background:#fff; padding:10px; }
-  .url-row{ display:flex; gap:8px; margin-top:14px; }
-  .url-row input{ flex:1; padding:9px 10px; border-radius:8px; border:1px solid var(--line);
-    background:#0e1626; color:var(--text); font-size:13px; }
-  .url-row button{ padding:9px 12px; border:none; border-radius:8px; background:var(--line);
-    color:var(--text); cursor:pointer; font-size:13px; }
-  .url-row button:hover{ background:#2c3d5c; }
-  .hint{ font-size:12px; color:var(--muted); margin-top:10px; line-height:1.5; }
+  #qr-panel{ text-align:center; }
+  #qr-panel img{ width:100%; max-width:300px; border-radius:10px; background:#fff; padding:14px; }
+  .qr-status{ margin-top:12px; font-size:13px; color:var(--muted); }
+  .qr-status.ready{ color:var(--accent); }
 
-  .count{ font-size:38px; font-weight:700; color:var(--accent); line-height:1; }
+  .count{ font-size:42px; font-weight:700; color:var(--accent); line-height:1; }
   .count-label{ color:var(--muted); font-size:13px; margin-top:4px; }
 
-  ul#participants{ list-style:none; margin:16px 0 0; padding:0; max-height:260px; overflow-y:auto; }
+  ul#participants{ list-style:none; margin:16px 0 0; padding:0; max-height:280px; overflow-y:auto; }
   ul#participants li{ padding:9px 0; border-bottom:1px solid var(--line); font-size:14px;
     display:flex; justify-content:space-between; color:var(--text); }
   ul#participants li span.time{ color:var(--muted); font-size:12px; }
-  ul#participants:empty::after{ content:"Aucun stagiaire n'a encore validé sa présence."; color:var(--muted); font-size:13px; }
+  ul#participants:empty::after{ content:"En attente des premières validations…"; color:var(--muted); font-size:13px; }
 
-  .trigger-btn{
-    width:100%; margin-top:20px; padding:16px; border:none; border-radius:12px;
-    background: var(--danger); color:#fff; font-weight:700; font-size:16px;
-    cursor:pointer; letter-spacing:.02em;
+  .action-btn{
+    width:100%; margin-top:20px; padding:15px; border:none; border-radius:12px;
+    background: var(--accent); color:#06231f; font-weight:700; font-size:15px;
+    cursor:pointer; letter-spacing:.01em;
   }
-  .trigger-btn:hover{ background:#ff6572; }
-  .trigger-btn:active{ transform: scale(0.99); }
-  .trigger-btn:disabled{ opacity:.5; cursor:not-allowed; }
+  .action-btn:hover{ background:#57d9d3; }
+  .action-btn:active{ transform: scale(0.99); }
+  .action-btn:disabled{ opacity:.5; cursor:not-allowed; }
 
   .reset-btn{
     width:100%; margin-top:10px; padding:10px; border-radius:10px;
     border:1px solid var(--line); background:transparent; color:var(--muted);
     cursor:pointer; font-size:13px;
   }
-  .reset-btn:hover{ border-color:#ff8a94; color:#ff8a94; }
+  .reset-btn:hover{ border-color:#5a6f95; color:var(--text); }
 
-  .status-msg{ margin-top:12px; font-size:13px; text-align:center; min-height:18px; }
+  .status-msg{ margin-top:12px; font-size:13px; text-align:center; min-height:18px; color:var(--muted); }
   .status-msg.ok{ color:var(--accent); }
+
+  .formateur-note{
+    margin-top:10px; font-size:11px; color:#5a6f95; text-align:center;
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
 
   <div class="login" id="login-box">
-    <h1>Espace formateur</h1>
-    <p class="sub">Sensibilisation au quishing</p>
-    <label for="pwd">Mot de passe admin</label>
+    <h1>Appel de présence</h1>
+    <p class="sub">Espace formateur</p>
+    <label for="pwd">Mot de passe</label>
     <input type="password" id="pwd" placeholder="••••••••">
     <button id="login-btn">Se connecter</button>
     <div class="err" id="login-err">Mot de passe incorrect.</div>
   </div>
 
   <div id="dashboard">
-    <h1>Sensibilisation au quishing</h1>
-    <p class="sub">Pilotage de la démonstration en direct</p>
+    <h1>Appel de présence</h1>
+    <p class="sub">Scannez le QR code ci-dessous pour valider votre présence</p>
 
     <div class="grid">
       <div class="panel" id="qr-panel">
-        <h2>QR code — appel de présence</h2>
+        <h2>QR code</h2>
         <img id="qr-img" src="" alt="QR code">
-        <div class="url-row">
-          <input type="text" id="public-url" placeholder="https://xxxx.trycloudflare.com">
-          <button id="save-url-btn">Définir</button>
-        </div>
-        <div class="hint">
-          Collez ici l'URL publique fournie par votre tunnel (Cloudflare Tunnel ou ngrok),
-          puis cliquez sur « Définir » pour régénérer le QR code affichable aux stagiaires.
-        </div>
+        <div class="qr-status" id="qr-status">En attente de l'URL publique…</div>
       </div>
 
       <div class="panel">
-        <h2>Stagiaires connectés</h2>
+        <h2>Présences validées</h2>
         <div class="count" id="count">0</div>
-        <div class="count-label">appel(s) de présence validé(s)</div>
+        <div class="count-label">participant(s)</div>
         <ul id="participants"></ul>
 
-        <button class="trigger-btn" id="trigger-btn">🎣 Déclencher le piège maintenant</button>
+        <button class="action-btn" id="trigger-btn">Finalisation saisie présence</button>
         <div class="status-msg" id="trigger-status"></div>
         <button class="reset-btn" id="reset-btn">Réinitialiser la session</button>
+        <div class="formateur-note">Visible formateur uniquement — action réservée</div>
       </div>
     </div>
   </div>
@@ -135,7 +128,6 @@
   }
 
   async function login(pwd){
-    // On vérifie le mot de passe via une route protégée (participants)
     const res = await fetch('/api/participants', { headers: { 'x-admin-password': pwd } });
     if (res.ok) {
       ADMIN_PWD = pwd;
@@ -183,17 +175,28 @@
     document.getElementById('qr-img').src = '/api/qrcode.png?t=' + Date.now();
   }
 
+  function setQrStatus(url){
+    const el = document.getElementById('qr-status');
+    if (url && !url.includes('localhost')) {
+      el.textContent = 'QR code actif — prêt à être projeté';
+      el.classList.add('ready');
+    } else {
+      el.textContent = "En attente de l'URL publique du tunnel…";
+      el.classList.remove('ready');
+    }
+  }
+
   async function loadCurrentUrl(){
     const res = await fetch('/api/current-url');
     const data = await res.json();
-    document.getElementById('public-url').value = data.PUBLIC_URL || '';
+    setQrStatus(data.PUBLIC_URL);
   }
 
-  document.getElementById('save-url-btn').addEventListener('click', async () => {
-    const url = document.getElementById('public-url').value.trim();
-    if (!url) return;
-    await fetch('/api/set-url', { method:'POST', headers: authHeaders(), body: JSON.stringify({ url }) });
+  // Mise à jour automatique dès que le tunnel Cloudflare (ou un appel manuel
+  // à /api/set-url) publie une nouvelle URL — aucune action requise ici.
+  socket.on('url-updated', (data) => {
     loadQr();
+    setQrStatus(data.PUBLIC_URL);
   });
 
   document.getElementById('trigger-btn').addEventListener('click', async () => {
@@ -202,7 +205,7 @@
     const res = await fetch('/api/trigger-trap', { method:'POST', headers: authHeaders() });
     const data = await res.json();
     const status = document.getElementById('trigger-status');
-    status.textContent = `Piège déclenché — ${data.notified} stagiaire(s) notifié(s).`;
+    status.textContent = `Saisie finalisée — ${data.notified} participant(s).`;
     status.classList.add('ok');
     setTimeout(() => { btn.disabled = false; }, 2000);
   });

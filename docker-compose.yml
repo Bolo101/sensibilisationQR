@@ -1,0 +1,13 @@
+services:
+  quishing-demo:
+    build: .
+    container_name: quishing-demo
+    ports:
+      # Accès local pour vérification (http://localhost:3000).
+      # Les stagiaires, eux, passeront uniquement par l'URL du tunnel
+      # Cloudflare, générée et injectée automatiquement au démarrage.
+      - "3000:3000"
+    environment:
+      - ADMIN_PASSWORD=formation2026
+      - PORT=3000
+    restart: unless-stopped
