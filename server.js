@@ -14,13 +14,21 @@ const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'formation2026';
 
 app.use(express.json());
+
+// La racine "/" (ex: l'URL brute du tunnel Cloudflare/ngrok) redirige vers la
+// page de présence, pour éviter un "Cannot GET /" quand on ouvre l'URL sans
+// chemin précis dans un navigateur.
+app.get('/', (req, res) => {
+  res.redirect('/presence.html');
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // URL publique utilisée pour générer le QR code (à définir après avoir lancé
 // le tunnel cloudflared/ngrok). Configurable sans redémarrer via /api/set-url.
 let PUBLIC_URL = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
 
-// Liste des stagiaires ayant "fait l'appel" (en mémoire, RAM uniquement)
+// Participants : { name, time } — pour l'affichage du compteur de présence
 const participants = [];
 
 // --- Middleware simple pour protéger les routes admin ---
@@ -32,7 +40,7 @@ function checkAdmin(req, res, next) {
   next();
 }
 
-// --- Appel de présence : le stagiaire soumet son nom ---
+// --- Appel de présence : le stagiaire soumet nom et prénom en un seul écran ---
 app.post('/api/presence', (req, res) => {
   const name = (req.body.name || '').toString().trim().slice(0, 80);
   if (!name) return res.status(400).json({ error: 'Nom requis' });
@@ -60,6 +68,7 @@ app.post('/api/set-url', checkAdmin, (req, res) => {
   const url = (req.body.url || '').toString().trim().replace(/\/$/, '');
   if (!url) return res.status(400).json({ error: 'URL requise' });
   PUBLIC_URL = url;
+  io.emit('url-updated', { PUBLIC_URL });
   res.json({ ok: true, PUBLIC_URL });
 });
 
@@ -72,7 +81,9 @@ app.get('/api/participants', checkAdmin, (req, res) => {
   res.json({ participants });
 });
 
-// --- Déclenchement du piège en direct ---
+// --- Déclenchement manuel du piège, en plus du minuteur automatique côté
+// client (utile pour forcer la révélation immédiatement pour tout le monde,
+// par exemple pour clore l'exercice avant la fin des 10 secondes) ---
 app.post('/api/trigger-trap', checkAdmin, (req, res) => {
   io.to('presence-room').emit('trap-triggered');
   res.json({ ok: true, notified: participants.length });
@@ -84,7 +95,7 @@ app.post('/api/reset', checkAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// --- Sockets ---
+// --- Sockets : uniquement pour le déclenchement manuel depuis l'admin ---
 io.on('connection', (socket) => {
   socket.on('join-presence', () => {
     socket.join('presence-room');

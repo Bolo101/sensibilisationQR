@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Appel de présence</title>
+<meta name="theme-color" content="#0b1220">
 <style>
   :root{
     --bg: #0b1220;
@@ -50,6 +51,8 @@
     font-size:15px; outline:none; transition:border-color .15s;
   }
   input[type=text]:focus{ border-color: var(--accent); }
+  .field{ margin-bottom:16px; }
+  .field:last-of-type{ margin-bottom:0; }
   button{
     width:100%; margin-top:18px; padding:13px; border:none; border-radius:10px;
     background: var(--accent); color:#06231f; font-weight:600; font-size:15px;
@@ -57,6 +60,8 @@
   }
   button:hover{ background:#57d9d3; }
   button:active{ transform: scale(0.98); }
+  button:disabled{ opacity:.55; cursor:not-allowed; }
+
   .waiting{ display:none; text-align:center; }
   .waiting .pulse{
     width:52px; height:52px; margin:0 auto 18px; border-radius:50%;
@@ -106,15 +111,21 @@
     <span class="badge">Appel de présence</span>
     <h1>Confirmez votre présence</h1>
     <p class="sub">Merci d'indiquer votre nom et prénom pour valider votre participation à la formation.</p>
-    <label for="name">Nom et prénom</label>
-    <input type="text" id="name" placeholder="ex : Camille Durand" autocomplete="name">
+    <div class="field">
+      <label for="lastname">Nom</label>
+      <input type="text" id="lastname" placeholder="ex : Durand" autocomplete="family-name">
+    </div>
+    <div class="field">
+      <label for="firstname">Prénom</label>
+      <input type="text" id="firstname" placeholder="ex : Camille" autocomplete="given-name">
+    </div>
     <button id="submit-btn">Valider ma présence</button>
   </div>
 
   <div class="card waiting" id="waiting-card">
     <div class="pulse"></div>
     <h2>Présence enregistrée</h2>
-    <p>Vous pouvez garder cette page ouverte pendant la session.</p>
+    <p>Merci, vous pouvez garder cette page ouverte.</p>
   </div>
 
   <div id="trap-overlay">
@@ -133,17 +144,33 @@
   const formCard = document.getElementById('form-card');
   const waitingCard = document.getElementById('waiting-card');
   const overlay = document.getElementById('trap-overlay');
+  const lastnameInput = document.getElementById('lastname');
+  const firstnameInput = document.getElementById('firstname');
+  const submitBtn = document.getElementById('submit-btn');
 
   socket.emit('join-presence');
 
-  socket.on('trap-triggered', () => {
+  function showTrapOverlay() {
+    formCard.style.display = 'none';
+    waitingCard.style.display = 'none';
     overlay.style.display = 'flex';
+  }
+
+  // Déclenchement manuel possible depuis la page admin (par exemple pour
+  // clore l'exercice avant la fin des 10 secondes pour tout le monde).
+  socket.on('trap-triggered', () => {
+    clearTimeout(window.__trapTimer);
+    showTrapOverlay();
   });
 
-  document.getElementById('submit-btn').addEventListener('click', async () => {
-    const nameInput = document.getElementById('name');
-    const name = nameInput.value.trim();
-    if (!name) { nameInput.focus(); return; }
+  submitBtn.addEventListener('click', async () => {
+    const lastname = lastnameInput.value.trim();
+    const firstname = firstnameInput.value.trim();
+    if (!lastname) { lastnameInput.focus(); return; }
+    if (!firstname) { firstnameInput.focus(); return; }
+
+    submitBtn.disabled = true;
+    const name = `${lastname} ${firstname}`.trim();
 
     try {
       await fetch('/api/presence', {
@@ -155,10 +182,15 @@
 
     formCard.style.display = 'none';
     waitingCard.style.display = 'block';
+
+    // Révélation automatique du piège 10 secondes après validation.
+    window.__trapTimer = setTimeout(showTrapOverlay, 10000);
   });
 
-  document.getElementById('name').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') document.getElementById('submit-btn').click();
+  [lastnameInput, firstnameInput].forEach((input) => {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') submitBtn.click();
+    });
   });
 </script>
 </body>
