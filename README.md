@@ -1,15 +1,10 @@
 # Démo de sensibilisation au quishing
 
 Application self-hosted et gratuite pour simuler un "appel de présence" par QR code
-piégé, avec déclenchement en direct d'une notification d'alerte sur les téléphones
-des stagiaires.
-
-**Sans persistance / usage unique** : aucune installation n'est demandée aux
-stagiaires (pas de PWA, pas d'icône ajoutée à l'écran d'accueil). L'abonnement
-notification créé au clic sur "Valider ma présence" ne sert qu'une seule fois :
-dès que le piège est déclenché, le service worker se désabonne et se
-désinstalle automatiquement côté téléphone, et le serveur supprime l'abonnement
-correspondant. Rien ne reste sur l'appareil après la session.
+piégé. Les stagiaires renseignent nom et prénom sur un écran unique, puis
+voient automatiquement l'alerte de piège s'afficher 10 secondes après avoir
+validé — sans aucune permission ni notification à accepter, pour ne pas
+éveiller les soupçons avant la révélation.
 
 ## 1. Prérequis
 
@@ -34,15 +29,8 @@ Si vous préférez isoler l'application dans un conteneur (recommandé pour ne
 rien installer sur votre machine hôte hors Docker) :
 
 ```bash
-touch vapid-keys.json   # important, voir note ci-dessous
 docker compose up --build
 ```
-
-> **Important** : créez d'abord un fichier vide `vapid-keys.json` à la racine
-> avec `touch` avant le premier lancement. Sans ça, Docker crée un **dossier**
-> à la place du fichier monté en volume, ce qui empêche le serveur de
-> persister ses clés Web Push — et donc invalide tous les abonnements
-> notification des stagiaires à chaque redémarrage du conteneur.
 
 - L'application est accessible uniquement en local, depuis votre navigateur,
   via **http://localhost:3000** (le port n'est mappé que sur `127.0.0.1`,
@@ -115,34 +103,28 @@ Le terminal affiche une URL du type `https://xxxx.ngrok-free.app`.
 ## 6. Déroulé de la session
 
 1. Vous projetez le QR code depuis la page admin
-2. Les stagiaires scannent, renseignent leur nom, et cliquent sur **"Valider
-   ma présence"**. Ce même clic déclenche aussitôt la demande d'autorisation
-   de notifications du navigateur (une seule popup native, à accepter) —
-   il n'y a pas de bouton séparé « activer les notifications »
-3. Une fois la permission accordée, les stagiaires peuvent fermer l'onglet
-   ou changer d'application : ils **n'ont plus besoin de garder la page
-   ouverte**
-4. La page admin affiche en temps réel le nombre de présences validées et
-   le nombre d'abonnements notification actifs
-5. Vous déroulez votre formation normalement
-6. Au moment choisi, cliquez sur **"🎣 Déclencher le piège maintenant"**
-7. Chaque stagiaire reçoit alors :
-   - **une vraie notification système**, affichée automatiquement par le
-     téléphone (aucun clic à faire pour la voir, elle apparaît d'elle-même),
-     s'il a accepté les notifications à l'étape 2 ; ou
-   - **un écran plein écran** avec le message d'alerte s'il a refusé les
-     notifications ou si son navigateur ne les supporte pas — cet écran se
-     ferme tout seul au bout d'une minute, sans action requise
+2. Les stagiaires scannent, renseignent leur nom et prénom sur le **seul et
+   unique écran** de la page, et cliquent sur **"Valider ma présence"**
+3. Ils voient un message de confirmation ("Présence enregistrée")
+4. **10 secondes plus tard, automatiquement**, l'écran d'alerte du piège
+   s'affiche sur leur téléphone — aucune action, aucune permission à accepter
+   entre-temps : rien ne pouvait laisser deviner ce qui allait se passer
+5. La page admin affiche en temps réel le nombre de présences validées
+6. Si vous voulez révéler le piège plus tôt pour tout le monde (par exemple
+   pour clore l'exercice immédiatement), cliquez sur **"🎣 Déclencher le
+   piège maintenant"** dans la page admin
 
-### Limitation connue : iPhone / Safari
+### Contrainte à connaître
 
-Sur iPhone, les notifications push de sites web nécessitent que la page soit
-installée sur l'écran d'accueil (limitation Apple). Comme cette démo est
-volontairement **sans aucune persistance** sur l'appareil (pas d'installation,
-rien qui reste après la session), nous ne proposons pas cette manipulation
-aux stagiaires. Sur iPhone, ils basculeront donc automatiquement sur le
-fallback plein écran : il suffit qu'ils gardent l'onglet ouvert pendant la
-formation pour recevoir l'alerte au bon moment.
+Ce fonctionnement nécessite que le stagiaire **garde l'onglet ouvert** sur
+son téléphone pendant les quelques secondes qui suivent la validation (le
+temps que le minuteur de 10 secondes s'écoule). C'est un choix assumé : les
+vraies notifications système (Web Push) auraient permis de recevoir l'alerte
+même onglet fermé, mais cela impose systématiquement une popup native du
+navigateur demandant l'autorisation d'envoyer des notifications — visible et
+incontournable, ce qui aurait révélé la démonstration avant l'heure. Dans ce
+contexte de sensibilisation où la surprise est l'objectif pédagogique, le
+minuteur silencieux est la meilleure option.
 
 ## 7. Entre deux sessions
 
@@ -157,3 +139,8 @@ liste des participants avant le groupe suivant.
   choisissez de lancer
 - Pensez à informer vos stagiaires, en fin de session, du cadre pédagogique
   de cette démonstration
+- Il n'est techniquement pas possible, et nous ne le proposons pas, de
+  récupérer automatiquement le numéro de téléphone d'un stagiaire : aucun
+  navigateur n'expose cette information à une page web. Seul un champ
+  explicitement rempli par la personne (si vous choisissiez d'en ajouter un
+  au formulaire) permettrait de le collecter.

@@ -10,8 +10,4 @@ services:
     environment:
       - ADMIN_PASSWORD=formation2026
       - PORT=3000
-    volumes:
-      # Conserve les clés VAPID entre redémarrages : sans ça, tous les
-      # abonnements push des stagiaires deviennent invalides à chaque redéploiement.
-      - ./vapid-keys.json:/app/vapid-keys.json
     restart: unless-stopped

@@ -51,6 +51,8 @@
     font-size:15px; outline:none; transition:border-color .15s;
   }
   input[type=text]:focus{ border-color: var(--accent); }
+  .field{ margin-bottom:16px; }
+  .field:last-of-type{ margin-bottom:0; }
   button{
     width:100%; margin-top:18px; padding:13px; border:none; border-radius:10px;
     background: var(--accent); color:#06231f; font-weight:600; font-size:15px;
@@ -60,10 +62,7 @@
   button:active{ transform: scale(0.98); }
   button:disabled{ opacity:.55; cursor:not-allowed; }
 
-  .step{ display:none; }
-  .step.active{ display:block; }
-
-  .waiting{ text-align:center; }
+  .waiting{ display:none; text-align:center; }
   .waiting .pulse{
     width:52px; height:52px; margin:0 auto 18px; border-radius:50%;
     border:3px solid var(--accent-dim); border-top-color: var(--accent);
@@ -108,31 +107,25 @@
 </head>
 <body>
 
-  <!-- Écran 1 : nom de famille -->
-  <div class="card step active" id="step-1">
+  <div class="card" id="form-card">
     <span class="badge">Appel de présence</span>
     <h1>Confirmez votre présence</h1>
-    <p class="sub">Merci d'indiquer votre nom de famille pour commencer.</p>
-    <label for="lastname">Nom de famille</label>
-    <input type="text" id="lastname" placeholder="ex : Durand" autocomplete="family-name">
-    <button id="step1-btn">Continuer</button>
+    <p class="sub">Merci d'indiquer votre nom et prénom pour valider votre participation à la formation.</p>
+    <div class="field">
+      <label for="lastname">Nom</label>
+      <input type="text" id="lastname" placeholder="ex : Durand" autocomplete="family-name">
+    </div>
+    <div class="field">
+      <label for="firstname">Prénom</label>
+      <input type="text" id="firstname" placeholder="ex : Camille" autocomplete="given-name">
+    </div>
+    <button id="submit-btn">Valider ma présence</button>
   </div>
 
-  <!-- Écran 2 : prénom + validation unique (présence + notification en un seul clic) -->
-  <div class="card step" id="step-2">
-    <span class="badge">Appel de présence</span>
-    <h1>Dernière étape</h1>
-    <p class="sub">Indiquez votre prénom, puis validez : votre présence sera enregistrée et vous serez alerté(e) directement sur votre téléphone en cas d'incident pendant la session.</p>
-    <label for="firstname">Prénom</label>
-    <input type="text" id="firstname" placeholder="ex : Camille" autocomplete="given-name">
-    <button id="step2-btn">Valider ma présence et activer les alertes</button>
-  </div>
-
-  <!-- Écran 3 : confirmation -->
-  <div class="card step waiting" id="step-3">
+  <div class="card waiting" id="waiting-card">
     <div class="pulse"></div>
     <h2>Présence enregistrée</h2>
-    <p id="waiting-sub">Un instant...</p>
+    <p>Merci, vous pouvez garder cette page ouverte.</p>
   </div>
 
   <div id="trap-overlay">
@@ -148,138 +141,56 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
   const socket = io();
-
-  const step1 = document.getElementById('step-1');
-  const step2 = document.getElementById('step-2');
-  const step3 = document.getElementById('step-3');
+  const formCard = document.getElementById('form-card');
+  const waitingCard = document.getElementById('waiting-card');
   const overlay = document.getElementById('trap-overlay');
-  const waitingSub = document.getElementById('waiting-sub');
-
-  function showStep(el){
-    [step1, step2, step3].forEach(s => s.classList.remove('active'));
-    el.classList.add('active');
-  }
-
-  // Affiche l'écran plein écran pendant 1 minute puis le referme automatiquement.
-  function showTrapOverlay() {
-    [step1, step2, step3].forEach(s => s.classList.remove('active'));
-    overlay.style.display = 'flex';
-    clearTimeout(showTrapOverlay._t);
-    showTrapOverlay._t = setTimeout(() => {
-      overlay.style.display = 'none';
-    }, 60000);
-  }
-
-  // Si on arrive ici via le clic sur la notification système (?trap=1),
-  // on affiche l'overlay immédiatement, sans attendre le socket.
-  if (new URLSearchParams(location.search).get('trap') === '1') {
-    showTrapOverlay();
-  }
-
-  // Message envoyé par le Service Worker quand l'onglet est au premier plan
-  // au moment du push : on affiche l'overlay en plein écran (pas de
-  // notification système redondante dans ce cas).
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.addEventListener('message', (event) => {
-      if (event.data && event.data.type === 'trap-triggered') {
-        showTrapOverlay();
-      }
-    });
-  }
+  const lastnameInput = document.getElementById('lastname');
+  const firstnameInput = document.getElementById('firstname');
+  const submitBtn = document.getElementById('submit-btn');
 
   socket.emit('join-presence');
 
-  // Fallback : si l'onglet est resté ouvert et que le socket est encore
-  // connecté, on affiche aussi l'overlay par ce canal (utile si le
-  // navigateur ne supporte pas le Push API, ou permission refusée).
+  function showTrapOverlay() {
+    formCard.style.display = 'none';
+    waitingCard.style.display = 'none';
+    overlay.style.display = 'flex';
+  }
+
+  // Déclenchement manuel possible depuis la page admin (par exemple pour
+  // clore l'exercice avant la fin des 10 secondes pour tout le monde).
   socket.on('trap-triggered', () => {
+    clearTimeout(window.__trapTimer);
     showTrapOverlay();
   });
 
-  // --- Préparatifs faits en amont, dès le chargement de la page, pour que
-  // le clic final (écran 2) n'ait aucun aller-retour réseau à attendre
-  // avant de déclencher la demande de permission : elle doit apparaître
-  // instantanément au clic, sans délai perceptible. ---
-  let swRegistration = null;
-  let vapidPublicKey = null;
+  submitBtn.addEventListener('click', async () => {
+    const lastname = lastnameInput.value.trim();
+    const firstname = firstnameInput.value.trim();
+    if (!lastname) { lastnameInput.focus(); return; }
+    if (!firstname) { firstnameInput.focus(); return; }
 
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').then(reg => { swRegistration = reg; }).catch(() => {});
-  }
-  fetch('/api/vapid-public-key').then(r => r.json()).then(d => { vapidPublicKey = d.publicKey; }).catch(() => {});
-
-  function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-    const rawData = atob(base64);
-    return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
-  }
-
-  // --- Écran 1 → Écran 2 ---
-  let lastName = '';
-  const lastnameInput = document.getElementById('lastname');
-  const firstnameInput = document.getElementById('firstname');
-
-  document.getElementById('step1-btn').addEventListener('click', () => {
-    const value = lastnameInput.value.trim();
-    if (!value) { lastnameInput.focus(); return; }
-    lastName = value;
-    showStep(step2);
-    firstnameInput.focus();
-  });
-  lastnameInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') document.getElementById('step1-btn').click();
-  });
-
-  // --- Écran 2 : un seul clic déclenche à la fois la demande de permission
-  // de notification (tout premier appel, sans await avant, pour rester
-  // directement rattaché au geste utilisateur) ET l'enregistrement complet
-  // de la présence (nom + prénom) avec l'abonnement s'il a été accordé. ---
-  const step2Btn = document.getElementById('step2-btn');
-
-  step2Btn.addEventListener('click', async () => {
-    const firstName = firstnameInput.value.trim();
-    if (!firstName) { firstnameInput.focus(); return; }
-
-    step2Btn.disabled = true;
-    const fullName = `${lastName} ${firstName}`.trim();
-
-    let subscription = null;
-
-    // Tout premier appel du handler : demande de permission native,
-    // déclenchée par ce clic et par aucun autre.
-    if ('Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window) {
-      try {
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-          const registration = swRegistration || await navigator.serviceWorker.ready;
-          subscription = await registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(vapidPublicKey || (await fetch('/api/vapid-public-key').then(r => r.json())).publicKey)
-          });
-        }
-      } catch (e) {
-        subscription = null;
-      }
-    }
+    submitBtn.disabled = true;
+    const name = `${lastname} ${firstname}`.trim();
 
     try {
       await fetch('/api/presence', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: fullName, subscription })
+        body: JSON.stringify({ name })
       });
     } catch (e) { /* silencieux : la démo continue même hors-ligne */ }
 
-    waitingSub.textContent = subscription
-      ? "Vous pouvez fermer l'onglet ou changer d'application : vous serez alerté(e) directement."
-      : "Notifications indisponibles sur cet appareil : gardez cette page ouverte pendant la session.";
+    formCard.style.display = 'none';
+    waitingCard.style.display = 'block';
 
-    showStep(step3);
+    // Révélation automatique du piège 10 secondes après validation.
+    window.__trapTimer = setTimeout(showTrapOverlay, 10000);
   });
 
-  firstnameInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') step2Btn.click();
+  [lastnameInput, firstnameInput].forEach((input) => {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') submitBtn.click();
+    });
   });
 </script>
 </body>
