@@ -70,7 +70,8 @@ app.get('/api/vapid-public-key', (req, res) => {
   res.json({ publicKey: vapidKeys.publicKey });
 });
 
-// --- Appel de présence : le stagiaire soumet son nom ---
+// --- Appel de présence + abonnement Web Push en un seul appel, déclenché
+// par un unique clic côté client (nom complet + abonnement optionnel) ---
 app.post('/api/presence', (req, res) => {
   const name = (req.body.name || '').toString().trim().slice(0, 80);
   if (!name) return res.status(400).json({ error: 'Nom requis' });
@@ -79,16 +80,12 @@ app.post('/api/presence', (req, res) => {
   participants.push(entry);
   io.to('admins').emit('participant-joined', entry);
 
-  res.json({ ok: true });
-});
+  const sub = req.body.subscription;
+  if (sub && sub.endpoint) {
+    addSubscription(sub);
+    io.to('admins').emit('subscription-count', { count: subscriptions.length });
+  }
 
-// --- Abonnement Web Push (appelé juste après la présence, une fois la
-// permission navigateur accordée) ---
-app.post('/api/subscribe', (req, res) => {
-  const sub = req.body;
-  if (!sub || !sub.endpoint) return res.status(400).json({ error: 'Abonnement invalide' });
-  addSubscription(sub);
-  io.to('admins').emit('subscription-count', { count: subscriptions.length });
   res.json({ ok: true });
 });
 
