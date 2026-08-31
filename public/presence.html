@@ -156,10 +156,9 @@
     overlay.style.display = 'flex';
   }
 
-  // Déclenchement manuel possible depuis la page admin (par exemple pour
-  // clore l'exercice avant la fin des 10 secondes pour tout le monde).
+  // Le seul déclenchement possible est celui envoyé par le formateur
+  // depuis la page admin (bouton "Finalisation saisie présence").
   socket.on('trap-triggered', () => {
-    clearTimeout(window.__trapTimer);
     showTrapOverlay();
   });
 
@@ -182,9 +181,6 @@
 
     formCard.style.display = 'none';
     waitingCard.style.display = 'block';
-
-    // Révélation automatique du piège 10 secondes après validation.
-    window.__trapTimer = setTimeout(showTrapOverlay, 10000);
   });
 
   [lastnameInput, firstnameInput].forEach((input) => {
